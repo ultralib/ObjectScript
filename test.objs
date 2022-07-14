@@ -1,0 +1,5 @@
+typecheck is_str -> (String)
+typecheck is_duck -> (typeof value === 'string' && value == 'duck')
+
+print(is_str('hello world'))
+print(is_duck('a'), is_duck('duck'))

@@ -1,0 +1,26 @@
+{
+  "name": "objectscript",
+  "version": "1.0.0",
+  "description": "object-oriented language, transpilable to modern JavaScript",
+  "main": "index.js",
+  "scripts": {
+    "make:parser": "pegjs -o src/parser/Parser.js src/parser/syntax.pegjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrai/ObjectScript.git"
+  },
+  "keywords": [
+    "scripting",
+    "language",
+    "oop",
+    "transpiler",
+    "parser"
+  ],
+  "author": "qrai",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/qrai/ObjectScript/issues"
+  },
+  "homepage": "https://github.com/qrai/ObjectScript#readme"
+}
