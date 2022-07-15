@@ -53,6 +53,10 @@
     }, head);
   }
 
+  function buildStatements(body) {
+    return body.map(stmt => stmt[0])
+  }
+
   function optionalList(value) {
     return value !== null ? value : [];
   }
@@ -176,6 +180,8 @@ Keyword
   / WithToken
   / EnumToken
   / IsToken
+  / TypeToken
+  / FieldToken
 
 FutureReservedWord
   = ClassToken
@@ -451,6 +457,8 @@ EnumToken       = "enum"       !IdentifierPart
 IsToken         = "is"         !IdentifierPart
 TypecheckToken  = "typecheck"  !IdentifierPart
 TypingToken     = "->"         !IdentifierPart
+TypeToken       = "typedef"    !IdentifierPart
+FieldToken      = "field"      !IdentifierPart
 
 // Skipped
 
@@ -479,10 +487,11 @@ EOF
 
 PrimaryExpression
   = ThisToken { return { type: "ThisExpression" }; }
+  / TypeLiteral
+  / EnumLiteral
   / Identifier
   / Literal
   / ArrayLiteral
-  / EnumLiteral
   / ObjectLiteral
   / "(" __ expression:Expression __ ")" { return expression; }
 
@@ -546,8 +555,8 @@ EnumLiteral
     }
 
 EnumDefinition
-  = "enum" __ id:Identifier { return { id: id }}
-  / "enum" { return { id: null }}
+  = EnumToken __ id:Identifier { return { id: id }; }
+  / EnumToken { return { id: null }; }
 
 EnumValueList
   = head:(
@@ -563,6 +572,35 @@ EnumValueList
     { return Array.prototype.concat.apply(head, tail); }
 EnumElision
   = "|" values:(__ "|")* { return filledArray(values.length + 1, null); }
+
+TypeLiteral
+  = def:TypeDefinition __ "{" __ body:(TypeBodyStatement __)* __ "}" {
+      return { type: "TypeExpression", id: def.id, body: buildStatements(body) };
+    }
+TypeDefinition
+  = TypeToken __ id:Identifier { return { id: id }; }
+  / TypeToken { return { id: null }; }
+TypeBodyStatement
+  = field:FieldDeclaration { 
+      return field;
+    }
+  / id:Identifier __ "(" __ params:(FormalParameterList __)? ")" __
+    "{" __ body:FunctionBody __ "}" EOS {
+      return {
+        type: "MethodDeclaration",
+        id: id,
+        params: optionalList(extractOptional(params, 0)),
+        body: body.body
+      };
+    }
+
+FieldDeclaration
+  = FieldToken __ id:Identifier EOS { 
+      return { type: "FieldDeclaration", id: id };
+    }
+  / FieldToken __ id:Identifier __ TypingToken __ typecheck:Expression EOS { 
+      return { type: "FieldDeclaration", id: id, test: typecheck };
+    }
 
 ObjectLiteral
   = "{" __ "}" { return { type: "ObjectExpression", properties: [] }; }

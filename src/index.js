@@ -14,6 +14,9 @@ module.exports = {
         let webApiCode = await fs.readFile('src/native/ObjectWebApi.js', 'utf-8')
         let generatedCode = Generator.generate(ast)
 
-        return `${webApiCode}\n\n${generatedCode}`
+        return {
+            data: Generator.data,
+            code: `${webApiCode}\n\n${generatedCode}`
+        }
     }
 }

@@ -1,5 +1,20 @@
-typecheck is_str -> (String)
-typecheck is_duck -> (typeof value === 'string' && value == 'duck')
 
-print(is_str('hello world'))
-print(is_duck('a'), is_duck('duck'))
+typedef Element {
+    field body -> HTML
+
+    ctor(html) { this.body = html }
+}
+
+let styles = {
+    label: 'color:red;'
+}
+
+new Element(<>
+    <p class="$(styles.label)">Label</p>
+</>)
+
+/*
+Element(`
+    <p class="${styles.label}">Label</p>
+`)
+*/
