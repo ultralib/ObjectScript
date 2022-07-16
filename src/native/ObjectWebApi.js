@@ -42,7 +42,10 @@ const _o = Object.freeze({
 
         // Native methods
         let nativeMethods = [
-            'ctor', '_get_', '_set_',
+            'ctor', '_get_', '_set_'
+        ];
+        let nativeBaseMethods = [
+            'valueOf', 'toString'
         ];
 
         // Fields & Methods
@@ -105,6 +108,9 @@ const _o = Object.freeze({
                     get(target, prop) {
                         // Is symbol
                         if(typeof prop === 'symbol')
+                            return obj[prop]
+                        // Is base native thing
+                        if(nativeBaseMethods.includes(prop))
                             return obj[prop]
 
                         let { get } = data[prop]

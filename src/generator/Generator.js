@@ -105,6 +105,8 @@ module.exports = {
                 checkExpr = 'typeof value==="boolean"'
             else if(name === 'function')
                 checkExpr = 'typeof value==="function"'
+            else if(name === 'object')
+                checkExpr = 'typeof value==="object"'
             else if(name === 'array')
                 checkExpr = 'Array.isArray(value)'
             // Enum value
