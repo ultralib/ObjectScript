@@ -114,11 +114,16 @@ const _o = Object.freeze({
                             return obj[prop]
 
                         let { get } = data[prop]
-                        //TODO: check that is not native method
+
+                        // Check that field is not native
+                        if(nativeMethods.includes(prop)) {
+                            _o.$Log.err(`Failed to get native field/method '${prop}'`)
+                            return undefined
+                        }
 
                         // Check that field is defined
                         if(obj[prop] === undefined) {
-                            _o.$Log.err(`Failed to get field '${prop}' (field is not defined)`)
+                            _o.$Log.err(`Failed to get field/method '${prop}' (field is not defined)`)
                             return undefined
                         }
 
