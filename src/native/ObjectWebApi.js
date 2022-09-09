@@ -38,7 +38,7 @@ const _o = Object.freeze({
         let name = type.$name ?? '<anonymous>'
 
         // Constructor for type
-        let ctor = type.ctor ?? ({ handler: () => {} });
+        let ctor = type.ctor ?? (() => {});
 
         // Native methods
         let nativeMethods = [
@@ -150,7 +150,7 @@ const _o = Object.freeze({
                         return obj[prop]
                     },
                     set(target, prop, value) {
-                        let { set, typecheck } = data[prop]
+                        let { set, typecheck } = data[prop] ?? { set: undefined, typecheck: undefined }
 
                         // Check that prop is exists
                         if(obj[prop] === undefined) {
@@ -200,7 +200,7 @@ const _o = Object.freeze({
             });
 
             // Call the constructor for base object
-            ctor.handler.bind(basePrivateObject)(...args)
+            ctor.bind(basePrivateObject)(...args)
 
             return basePublicObject
         };

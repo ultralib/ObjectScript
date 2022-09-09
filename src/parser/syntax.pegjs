@@ -584,14 +584,11 @@ TypeBodyStatement
   = field:FieldDeclaration { 
       return field;
     }
-  / id:Identifier __ "(" __ params:(FormalParameterList __)? ")" __
-    "{" __ body:FunctionBody __ "}" EOS {
-      return {
-        type: "MethodDeclaration",
-        id: id,
-        params: optionalList(extractOptional(params, 0)),
-        body: body.body
-      };
+  / method:MethodDeclaration {
+      return method;
+    }
+  / ctor:CtorDeclaration {
+      return ctor;
     }
 
 FieldDeclaration
@@ -600,6 +597,25 @@ FieldDeclaration
     }
   / FieldToken __ id:Identifier __ TypingToken __ typecheck:Expression EOS { 
       return { type: "FieldDeclaration", id: id, test: typecheck };
+    }
+
+CtorDeclaration
+  = "ctor" __ "(" __ params:(FormalParameterList __)? ")" __ "{" __ body:FunctionBody __ "}" EOS {
+      return {
+        type: "CtorDeclaration",
+        params: optionalList(extractOptional(params, 0)),
+        body: body.body
+      };
+    }
+
+MethodDeclaration
+  = "method" __ id:Identifier __ "(" __ params:(FormalParameterList __)? ")" __ "{" __ body:FunctionBody __ "}" EOS {
+      return {
+        type: "MethodDeclaration",
+        id: id,
+        params: optionalList(extractOptional(params, 0)),
+        body: body.body
+      };
     }
 
 ObjectLiteral

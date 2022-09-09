@@ -6,11 +6,20 @@ const reportError = (text) => {
 }
 
 module.exports = {
+    // Registered enums, types, etc
     data: {
         enums: [],
         types: [],
-        prototypes: [],
         typechecks: [],
+        prototypes: [],
+        functions: []
+    },
+
+    encodedIndex: 0,
+    encoded: {},
+
+    transform: {
+        'print': `${apiObject}.$Log.print`
     },
 
     generate(ast) {
@@ -26,7 +35,15 @@ module.exports = {
         return body.map(stmt => this.generateStmt(stmt)).join('\n')
     },
 
-    generateStmt(node, beforeBlock) {
+    generateStmt(node, beforeBlock = null) {
+        // No node specified
+        if(!node)
+            return ''
+
+        // Transform arrays of statements to BlockStatement
+        if(Array.isArray(node))
+            node = { type: 'BlockStatement',  body: node }
+        
         switch(node.type) {
             // Block
             case 'BlockStatement':
@@ -62,6 +79,12 @@ module.exports = {
                 let varType = node.kind[0] === 'let' ? 'let' : 'var'
                 let varDecls = node.declarations.map(decl => {
                     let varName = this.generateExpr(decl.id)
+                    let encodedVarName = `_${this.encodedIndex++}`
+                    
+                    // Add to encoded
+                    this.encoded[varName] = encodedVarName
+                    // Encode
+                    varName = encodedVarName
                     
                     // Register enum in data
                     if(decl.init.type === 'EnumExpression')
@@ -92,7 +115,7 @@ module.exports = {
                 return 'break;'
             default:
                 console.log('Unknown statement', node)
-                return '/*STMT*/'
+                return `/*STMT:${node.type}:*/`
         }
     },
 
@@ -107,24 +130,24 @@ module.exports = {
             if(name === 'string')
                 expr = `typeof ${variable}==="string"`
             else if(name === 'number')
-                expr = 'typeof value==="number"'
-            else if(name === 'bool')
-                expr = 'typeof value==="boolean"'
+                expr = `typeof ${variable}==="number"`
+            else if(name === 'bool' || name === 'boolean')
+                expr = `typeof ${variable}==="boolean"`
             else if(name === 'function')
-                expr = 'typeof value==="function"'
+                expr = `typeof ${variable}==="function"`
             else if(name === 'object')
-                expr = 'typeof value==="object"'
+                expr = `typeof ${variable}==="object"`
             else if(name === 'array')
-                expr = 'Array.isArray(value)'
+                expr = `Array.isArray(${variable})`
             // Enum value
             else if(this.data.enums.includes(node.name))
-                expr = `${node.name}.is(value)`
+                expr = `${node.name}.is(${variable})`
             // Type value
             else if(this.data.types.includes(node.name))
-                expr = `value[_o.$DataPointer]?.type==="${node.name}"`
+                expr = `${variable}[_o.$DataPointer]?.type==="${node.name}"`
             // Typecheck value
             else if(this.data.typechecks.includes(node.name))
-                expr = `${node.name}(value)`
+                expr = `${node.name}(${variable})`
             else {
                 isDefault = false
                 expr = `(${this.generateExpr(node)})`
@@ -152,8 +175,12 @@ module.exports = {
         switch(node.type) {
             // Variable (abc)
             case 'Identifier':
-                if(node.name === 'print')
-                    node.name = `${apiObject}.$Log.print`
+                // Transform variables/functions to JS (ObjectWebApi)
+                if(this.transform[node.name])
+                    node.name = this.transform[node.name]
+                // Change to encoded identifiers
+                else if(this.encoded[node.name])
+                    node.name = this.encoded[node.name]
                 return node.name
             // This literal (this)
             case 'ThisExpression':
@@ -240,17 +267,24 @@ module.exports = {
             case 'EnumExpression':
                 return `${apiObject}.$Enum(${node.elements.map(ident => '"' + ident.name + '"').join(',')})`
             case 'TypeExpression':
+                const generateField = (member) => `${member.id.name}:{get:'public',set:'private',initial:null,${
+                    // Type checking
+                    member.test ? `typecheck:${this.generateTypecheck(member.test, true)}` : ''
+                }}`
+                const generateCtor = (member) => this.generateFunction(member, 'method', 'ctor')
+                const generateMethod = (member) => `${member.id.name}:{${this.generateFunction(member, 'method', 'handler')}}`
+
+                let typeName = node.id.name
+                let typeMembers = node.body.map(member => member.type === 'FieldDeclaration' ?
+                    // Field
+                    generateField(member)
+                    // Ctor/Method
+                    : member.type === 'CtorDeclaration' ? generateCtor(member) : generateMethod(member)
+                )
+
                 return `${apiObject}.$Type({
-                    $name: "${node.id.name}",
-                    ${node.body.map(member => member.type === 'FieldDeclaration' ?
-                        // Field
-                        `${member.id.name}:{get:'public',set:'private',initial:null,${
-                                // Type checking
-                                member.test ? `typecheck:${this.generateTypecheck(member.test, true)}` : ''
-                            }}`
-                        // Method
-                        : `${member.id.name}:{handler(${member.params.map(param => param.name).join(',')}){${this.generateBody(member.body)}}}`
-                    )}
+                    $name:"${typeName}",
+                    ${typeMembers}
                 })`
             // Function expression
             case 'FunctionExpression':
@@ -261,25 +295,25 @@ module.exports = {
         }
     },
 
-    generateFunction(node, as = 'function') {
-        let id = typeof node.id === 'object' ? node.id.name : node.id
-        let paramValidation = `if(!(${node.params.map(param => {
+    generateFunction(node, as = 'function', useId = null) {
+        let id = useId ? useId : (typeof node.id === 'object' ? node.id.name : node.id)
+        let paramValidation = node.params.length > 0 ? `if(!(${node.params.map(param => {
             if(param.test)
                 return this.generateValidation(param.test, param.id.name).expr
             else
                 return 'true'
-        }).join('&&')})){${apiObject}.$Log.err('Arguments was invalid');}`
+        }).join('&&')})){${apiObject}.$Log.err('Arguments was invalid');return;}` : ''
         let params = node.params.map(param => param.id.name).join(',')
 
         // Function (declaration/expression)
         if(as === 'function')
-            return `function ${id ?? ''}(${params}) ${this.generateStmt(node.body, paramValidation)}`
+            return `function ${id ?? ''}(${params})${this.generateStmt(node.body, paramValidation)}`
         // Anonymous
         else if(as === 'anonymous')
-            return `(${params}) => ${this.generateStmt(node.body)}`
+            return `(${params})=>${this.generateStmt(node.body, paramValidation)}`
         // Method (of object/class)
         else if(as === 'method')
-            return `${id}(${params}) ${this.generateStmt(node.body)}`
+            return `${id}(${params})${this.generateStmt(node.body, paramValidation)}`
     },
 
     generateArgs(exprArray) {

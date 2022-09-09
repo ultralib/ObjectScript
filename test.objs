@@ -1,5 +1,20 @@
-function build(str -> value.startsWith('<')) {
-    console.log(str)
+enum ElementTag {
+    Text | Block
 }
 
-build('hello')
+typedef Element {
+    field type -> ElementTag
+    field text -> String
+
+    ctor(type -> ElementTag, text -> String) {
+        this.type = tag
+        this.text = text
+    }
+
+    serialize() {
+        let tag = type == ElementTag.Text ? 'p' : 'div'
+        return '<' + tag + '>' + this.text + '</' + tag + '>'
+    }
+}
+
+print(new Element(ElementTag.Text, 'Hello!'))
