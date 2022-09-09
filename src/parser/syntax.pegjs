@@ -1374,9 +1374,17 @@ FunctionExpression
     }
 
 FormalParameterList
-  = head:Identifier tail:(__ "," __ Identifier)* {
+  = head:FormalParameter tail:(__ "," __ FormalParameter)* {
       return buildList(head, tail, 3);
     }
+
+FormalParameter
+  = id:Identifier __ TypingToken __ typecheck:Expression {
+    return { id: id, test: typecheck };
+  }
+  / id:Identifier {
+    return { id: id };
+  }
 
 FunctionBody
   = body:SourceElements? {

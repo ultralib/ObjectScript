@@ -171,8 +171,8 @@ const _o = Object.freeze({
                         }
 
                         // Check that types doesn't mismatch
-                        if(typecheck.bind(privateObj ?? target)(value) !== true) {
-                            _o.$Log.err(`Failed to change value of field '${prop}' to value '${value}' of ${typeof value} type (types mismatch)`)
+                        if(typecheck && typecheck.bind(privateObj ?? target)(value) !== true) {
+                            _o.$Log.err(`Failed to change value of field '${prop}' to value '${value}' of ${typeof value} type (value was invalid)`)
                             return false
                         }
                         

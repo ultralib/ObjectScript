@@ -23,14 +23,14 @@ module.exports = {
     },
 
     generateBody(body) {
-        return body.map(stmt => this.generateStmt(stmt)).join(';\n')
+        return body.map(stmt => this.generateStmt(stmt)).join('\n')
     },
 
-    generateStmt(node) {
+    generateStmt(node, beforeBlock) {
         switch(node.type) {
             // Block
             case 'BlockStatement':
-                return `{${this.generateBody(node.body)}}`
+                return `{${beforeBlock ?? ''}${this.generateBody(node.body)}}`
             // Expression
             case 'ExpressionStatement':
                 // Enum declaration as statement
@@ -38,17 +38,17 @@ module.exports = {
                     // Register enum in data
                     this.data.enums.push(node.expression.id.name)
 
-                    return `const ${node.expression.id.name}=${this.generateExpr(node.expression)}`
+                    return `const ${node.expression.id.name}=${this.generateExpr(node.expression)};`
                 }
                 // Type declaration as statement
                 if(node.expression.type === 'TypeExpression' && node.expression.id) {
                     // Register type in data
                     this.data.types.push(node.expression.id.name)
 
-                    return `const ${node.expression.id.name}=${this.generateExpr(node.expression)}`
+                    return `const ${node.expression.id.name}=${this.generateExpr(node.expression)};`
                 }
                 else
-                return `${this.generateExpr(node.expression)}`
+                return `${this.generateExpr(node.expression)};`
             // If/Else
             case 'IfStatement':
                 let ifStmt = `if(${this.generateExpr(node.test)})${this.generateStmt(node.consequent)}`
@@ -56,6 +56,7 @@ module.exports = {
                     return ifStmt + 'else ' + this.generateStmt(node.alternate)
                 else
                     return ifStmt
+            // For/Foreach
             // Variable declaration
             case 'VariableDeclaration':
                 let varType = node.kind[0] === 'let' ? 'let' : 'var'
@@ -71,69 +72,83 @@ module.exports = {
 
                     return `${varName}=${this.generateExpr(decl.init) || 'null'}`
                 }).join(',')
-                return `${varType} ${varDecls}`
+                return `${varType} ${varDecls};`
             // Typechecker declaration
             case 'TypecheckDeclaration':
-                return `const ${node.id.name}=(value)=>${this.generateExpr(node.test)}`
+                // Register typecheck in data
+                this.data.typechecks.push(node.id.name)
+                return `const ${node.id.name}=(value)=>${this.generateExpr(node.test)};`
+            // Function declaration
+            case 'FunctionDeclaration':
+                return `${this.generateFunction(node, 'function')}`
             // Return
             case 'ReturnStatement':
                 if(node.argument === null)
-                    return 'return'
+                    return 'return;'
                 else
-                    return `return ${this.generateExpr(node.argument)}`
+                    return `return ${this.generateExpr(node.argument)};`
             // Break
             case 'BreakStatement':
-                return 'break'
+                return 'break;'
             default:
+                console.log('Unknown statement', node)
                 return '/*STMT*/'
         }
     },
 
-    generateTypecheck(node, withContext = false) {
-        let checkExpr = ''
-        let isDefaultCheck = true
-        
+    generateValidation(node, variable = 'value') {
+        let isDefault = true
+        let expr = ''
+
         if(node.type === 'Identifier') {
             let name = node.name.toLowerCase()
             
             // Use primitive typechecker
             if(name === 'string')
-                checkExpr = 'typeof value==="string"'
+                expr = `typeof ${variable}==="string"`
             else if(name === 'number')
-                checkExpr = 'typeof value==="number"'
+                expr = 'typeof value==="number"'
             else if(name === 'bool')
-                checkExpr = 'typeof value==="boolean"'
+                expr = 'typeof value==="boolean"'
             else if(name === 'function')
-                checkExpr = 'typeof value==="function"'
+                expr = 'typeof value==="function"'
             else if(name === 'object')
-                checkExpr = 'typeof value==="object"'
+                expr = 'typeof value==="object"'
             else if(name === 'array')
-                checkExpr = 'Array.isArray(value)'
+                expr = 'Array.isArray(value)'
             // Enum value
             else if(this.data.enums.includes(node.name))
-                checkExpr = `${node.name}.is(value)`
+                expr = `${node.name}.is(value)`
             // Type value
             else if(this.data.types.includes(node.name))
-                checkExpr = `value[_o.$DataPointer]?.type==="${node.name}"`
+                expr = `value[_o.$DataPointer]?.type==="${node.name}"`
+            // Typecheck value
+            else if(this.data.typechecks.includes(node.name))
+                expr = `${node.name}(value)`
             else {
-                isDefaultCheck = false
-                checkExpr = this.generateExpr(node)
+                isDefault = false
+                expr = `(${this.generateExpr(node)})`
             }
         }
         else {
-            isDefaultCheck = false
-            checkExpr = this.generateExpr(node)
+            isDefault = false
+            expr = `(${this.generateExpr(node)})`
         }
 
-        return withContext && !isDefaultCheck ?
+        return { expr, isDefault }
+    },
+
+    generateTypecheck(node, withContext = false) {
+        let { expr, isDefault } = this.generateValidation(node)
+
+        return withContext && !isDefault ?
             // With 'this' context
-            `function(value){return ${checkExpr};}`
+            `function(value){return ${expr};}`
             // Without
-            : `(value)=>${checkExpr}`
+            : `(value)=>${expr}`
     },
 
     generateExpr(node) {
-        console.log(node)
         switch(node.type) {
             // Variable (abc)
             case 'Identifier':
@@ -229,7 +244,7 @@ module.exports = {
                     $name: "${node.id.name}",
                     ${node.body.map(member => member.type === 'FieldDeclaration' ?
                         // Field
-                        `${member.id.name}:{get:'public', set:'private', initial: null, ${
+                        `${member.id.name}:{get:'public',set:'private',initial:null,${
                                 // Type checking
                                 member.test ? `typecheck:${this.generateTypecheck(member.test, true)}` : ''
                             }}`
@@ -237,9 +252,34 @@ module.exports = {
                         : `${member.id.name}:{handler(${member.params.map(param => param.name).join(',')}){${this.generateBody(member.body)}}}`
                     )}
                 })`
+            // Function expression
+            case 'FunctionExpression':
+                return this.generateFunction(node, 'function')
             default:
-                return `/*-*/`
+                console.log('Unknown expression', node)
+                return `/*${node.type}*/`
         }
+    },
+
+    generateFunction(node, as = 'function') {
+        let id = typeof node.id === 'object' ? node.id.name : node.id
+        let paramValidation = `if(!(${node.params.map(param => {
+            if(param.test)
+                return this.generateValidation(param.test, param.id.name).expr
+            else
+                return 'true'
+        }).join('&&')})){${apiObject}.$Log.err('Arguments was invalid');}`
+        let params = node.params.map(param => param.id.name).join(',')
+
+        // Function (declaration/expression)
+        if(as === 'function')
+            return `function ${id ?? ''}(${params}) ${this.generateStmt(node.body, paramValidation)}`
+        // Anonymous
+        else if(as === 'anonymous')
+            return `(${params}) => ${this.generateStmt(node.body)}`
+        // Method (of object/class)
+        else if(as === 'method')
+            return `${id}(${params}) ${this.generateStmt(node.body)}`
     },
 
     generateArgs(exprArray) {

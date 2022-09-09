@@ -1,35 +1,5 @@
-enum Tag {
-    p | div
+function build(str -> value.startsWith('<')) {
+    console.log(str)
 }
 
-typecheck ElementInner -> (typeof value === 'string')
-
-typedef Element {
-    field tag -> Tag
-    field inner -> String
-    field attrs -> Object
-
-    ctor(tag, inner) {
-        this.tag = tag
-        this.inner = inner
-        this.attrs = {}
-    }
-
-    setAttr(name, value) {
-        this.attrs[name] = value
-    }
-
-    toString() {
-        return '<' + this.tag + this.serializeAttrs() + '>' + this.inner + '</' + this.tag + '>'
-    }
-    serializeAttrs() {
-        let finalStr = ''
-        // TODO: walk keys and write 'key="value"'
-        return finalStr
-    }
-}
-
-let textEl = new Element(Tag.p, 'hello world')
-textEl.setAttr('class', 'text')
-
-print(textEl + '')
+build('hello')

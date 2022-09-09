@@ -8,7 +8,7 @@ module.exports = {
     parse(code) {
         return Parser.parse(code)
     },
-    async transpile(code) {
+    async transpile(code, options) {
         let ast = this.parse(code)
 
         let webApiCode = await fs.readFile('src/native/ObjectWebApi.js', 'utf-8')
@@ -16,7 +16,7 @@ module.exports = {
 
         return {
             data: Generator.data,
-            code: `${webApiCode}\n\n${generatedCode}`
+            code: `${options?.debug !== true ? webApiCode : ''}\n\n${generatedCode}`
         }
     }
 }
