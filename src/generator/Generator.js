@@ -79,12 +79,13 @@ module.exports = {
                 let varType = node.kind[0] === 'let' ? 'let' : 'var'
                 let varDecls = node.declarations.map(decl => {
                     let varName = this.generateExpr(decl.id)
-                    let encodedVarName = `_${this.encodedIndex++}`
-                    
-                    // Add to encoded
-                    this.encoded[varName] = encodedVarName
-                    // Encode
-                    varName = encodedVarName
+                    // Encode variables?
+                    if(this.options?.encode === true) {
+                        // Add to encoded
+                        this.encoded[varName] = encodedVarName
+                        // Encode
+                        varName = `_${this.encodedIndex++}`
+                    }
                     
                     // Register enum in data
                     if(decl.init.type === 'EnumExpression')
@@ -179,7 +180,7 @@ module.exports = {
                 if(this.transform[node.name])
                     node.name = this.transform[node.name]
                 // Change to encoded identifiers
-                else if(this.encoded[node.name])
+                else if(this.options?.encode === true && this.encoded[node.name])
                     node.name = this.encoded[node.name]
                 return node.name
             // This literal (this)
@@ -296,7 +297,7 @@ module.exports = {
     },
 
     generateFunction(node, as = 'function', useId = null) {
-        let id = useId ? useId : (typeof node.id === 'object' ? node.id.name : node.id)
+        let id = useId ? useId : (typeof node.id?.name === 'string' ? node.id.name: node.id)
         let paramValidation = node.params.length > 0 ? `if(!(${node.params.map(param => {
             if(param.test)
                 return this.generateValidation(param.test, param.id.name).expr

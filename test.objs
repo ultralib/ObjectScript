@@ -1,20 +1,40 @@
-enum ElementTag {
-    Text | Block
-}
+function resolveDate(dateText -> String) {
+    dateText = dateText.toLowerCase();
+    let today = new Date();
 
-typedef Element {
-    field type -> ElementTag
-    field text -> String
+    // -----------
+    // | FORMAT: day, hh:mm
+    // -----------
+    let dateRelational = new RegExp(/(сегодня|вчера), (\d{1,2}):(\d{1,2})/g);
+    let dateRelationalResult = dateRelational.exec(dateText);
+    if(dateRelationalResult) {
+        let day = today.getDate();
 
-    ctor(type -> ElementTag, text -> String) {
-        this.type = tag
-        this.text = text
+        if(dateRelationalResult[1] === 'вчера') {
+            day--;
+        }
+
+        return { year: today.getFullYear(), month: today.getMonth() + 1, day: day };
     }
 
-    serialize() {
-        let tag = type == ElementTag.Text ? 'p' : 'div'
-        return '<' + tag + '>' + this.text + '</' + tag + '>'
+    // -----------
+    // | FORMAT: mm month, hh:mm
+    // -----------
+    let dateFull = new RegExp(/(\d{1,2}) (sep|nov), (\d{1,2}):(\d{1,2})/g);
+    let dateFullResult = dateFull.exec(dateText);
+    if(dateFullResult) {
+        let day = dateFullResult[1];
+        let monthText = dateFullResult[2];
+        let hour = dateFullResult[3];
+        let minute = dateFullResult[4];
+
+        return { year: today.getFullYear(), month: monthText, day: day, hour: hour, minute: minute  };
     }
+
+
+    // Unknown format
+    return null;
 }
 
-print(new Element(ElementTag.Text, 'Hello!'))
+print(resolveDate('сегодня, 10:20'));
+print(resolveDate('5 sep, 10:20'));
